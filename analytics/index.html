@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Analytics — Chess 3D Online &amp; Block Legend</title>
+<style>
+:root{--bg:#0f1420;--card:#171e2e;--line:#26314a;--txt:#e8ecf4;--mut:#9aa7bd;--acc:#ffb020;--grn:#2ecc71;--red:#ff6b6b;--blu:#4da3ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:22px;margin:6px 0 2px}.sub{color:var(--mut);font-size:13px;margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+select,input[type=file]{background:#0f1420;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:14px}
+button{background:var(--acc);color:#111;border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:14px}
+button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line);font-weight:600}
+button.danger{background:transparent;color:var(--red);border:1px solid var(--red);font-weight:600}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:26px;text-align:center;color:var(--mut);cursor:pointer}
+.drop.over{border-color:var(--acc);color:var(--txt)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi{background:#0f1420;border:1px solid var(--line);border-radius:10px;padding:12px}
+.kpi b{font-size:20px;display:block}.kpi span{color:var(--mut);font-size:12px}
+canvas{width:100%;height:260px;background:#0f1420;border:1px solid var(--line);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:600}.note{color:var(--mut);font-size:13px;line-height:1.6}
+.warn{border-color:#7a5b12;background:#2a2205;color:#ffd97a}
+code{background:#0f1420;padding:1px 5px;border-radius:5px}
+.pill{display:inline-block;background:#0f1420;border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:12px;color:var(--mut);margin:2px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🎮 Game Analytics</h1>
+<p class="sub">Chess 3D Online (com.kynam.chessonline) · Block Legend (com.kynam.blocklegend) — up file CSV từ AdMob / Play Console, dữ liệu chỉ xử lý trong trình duyệt của mày, không gửi đi đâu.</p>
+
+<div class="card warn"><b>⚠️ Đừng đăng doanh thu thật lên web công khai.</b><br><span class="note" style="color:#ffd97a">Netlify / Vercel / GitHub Pages free đều là web công khai — ai có link cũng xem được. Cách an toàn: xài file này ngay trên máy (mở file là chạy), hoặc deploy mà chỉ up dữ liệu đã ẩn doanh thu. Muốn chia sẻ cho người khác xem thì chỉ gửi file CSV đã xóa cột tiền.</span></div>
+
+<div class="card">
+<div class="row">
+<label>Game:
+<select id="game">
+<option value="chess">Chess 3D Online</option>
+<option value="blocklegend">Block Legend</option>
+</select></label>
+<label>Chỉ số biểu đồ:
+<select id="metric">
+<option value="earnings">Doanh thu ước tính ($)</option>
+<option value="installs">Lượt cài mới</option>
+<option value="impressions">Impressions quảng cáo</option>
+<option value="uninstalls">Lượt gỡ cài đặt</option>
+</select></label>
+<button id="sampleBtn" class="ghost">Xem dữ liệu mẫu (demo)</button>
+<button id="clearBtn" class="danger">Xóa dữ liệu game này</button>
+</div>
+<div class="drop" id="drop" style="margin-top:14px">Kéo thả file CSV vào đây, hoặc bấm để chọn file<br><span style="font-size:12px">Nhận file export từ AdMob (Reports → Download CSV) và Play Console (Statistics → Export report). Có thể up nhiều file, dữ liệu cùng ngày sẽ cộng dồn.</span>
+<input type="file" id="file" accept=".csv,text/csv" multiple class="hidden"></div>
+<p class="note" id="status">Chưa có dữ liệu. Up file CSV để xem biểu đồ.</p>
+<p><span class="pill">Cột ngày: Date</span><span class="pill">AdMob: Estimated earnings · Impressions · Ad requests · Clicks · eCPM</span><span class="pill">Play Console: Install events · Uninstall events · First opens</span></p>
+</div>
+
+<div class="card" id="dash" style="display:none">
+<div class="kpis">
+<div class="kpi"><b id="kInstalls">0</b><span>Lượt cài mới</span></div>
+<div class="kpi"><b id="kUninstalls">0</b><span>Lượt gỡ cài đặt</span></div>
+<div class="kpi"><b id="kImpr">0</b><span>Impressions</span></div>
+<div class="kpi"><b id="kClicks">0</b><span>Clicks</span></div>
+<div class="kpi"><b id="kEarn">$0.00</b><span>Doanh thu ước tính</span></div>
+<div class="kpi"><b id="kEcpm">$0.00</b><span>eCPM trung bình</span></div>
+<div class="kpi"><b id="kCtr">0%</b><span>CTR (clicks / impressions)</span></div>
+<div class="kpi"><b id="kDays">0</b><span>Số ngày có dữ liệu</span></div>
+</div>
+<h3 style="margin:18px 0 8px" id="chartTitle">Biểu đồ theo ngày</h3>
+<canvas id="chart" width="920" height="260"></canvas>
+<h3 style="margin:18px 0 8px">Bảng theo ngày</h3>
+<div style="overflow-x:auto"><table id="tbl"><thead><tr><th>Ngày</th><th>Cài mới</th><th>Gỡ</th><th>Impressions</th><th>Clicks</th><th>Doanh thu ($)</th><th>eCPM ($)</th></tr></thead><tbody></tbody></table></div>
+<div class="row" style="margin-top:14px"><button id="exportBtn" class="ghost">Tải CSV đã gộp</button><button id="tplBtn" class="ghost">Tải file mẫu CSV trống</button></div>
+</div>
+
+<div class="card"><h3 style="margin:0 0 8px">Lấy file CSV ở đâu?</h3>
+<p class="note"><b>AdMob:</b> AdMob → Reports → chọn report theo Date + App → Download CSV. Cột cần có: Date, Estimated earnings, Impressions, Ad requests, Clicks.<br>
+<b>Play Console:</b> Play Console → Statistics → chọn app → chọn metric (Install events / Uninstall events) → Export report (raw data).<br>
+<b>LevelPlay / Unity Ads:</b> dashboard của từng mạng cũng có nút export CSV — cột tên khác nhau nhưng chỉ cần có cột ngày + số là trang này đọc được, vì nó tự nhận diện tên cột.<br>
+<b>Deploy free:</b> kéo file <code>index.html</code> này thả vào <code>app.netlify.com/drop</code> là có link <code>ten-cua-may.netlify.app</code> — nhưng nhớ cảnh báo ở trên: đừng up dữ liệu thật lên link công khai.</p></div>
+</div>
+<script>
+const MAP=[[/date|ngày|day/, 'date'],[/uninstall/, 'uninstalls'],[/install/, 'installs'],[/impression/, 'impressions'],[/request/, 'requests'],[/click/, 'clicks'],[/earning|revenue|doanh thu/, 'earnings'],[/ecpm/, 'ecpm'],[/first open|active user/, 'opens']];
+function parseCSV(t){const rows=[];let cur=[''],q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'){if(t[i+1]=='"'){cur[cur.length-1]+='"';i++}else q=false}else cur[cur.length-1]+=c}else if(c=='"')q=true;else if(c==',')cur.push('');else if(c=='\n'||c=='\r'){if(c=='\r'&&t[i+1]=='\n')i++;rows.push(cur);cur=['']}else cur[cur.length-1]+=c}if(cur.length>1||cur[0])rows.push(cur);return rows.filter(r=>r.some(x=>String(x).trim()!==''))}
+function num(x){if(x==null)return 0;const n=parseFloat(String(x).replace(/[$,%\s]/g,'').replace(/,/g,''));return isNaN(n)?0:n}
+function key(){return 'ga-'+document.getElementById('game').value}
+function load(){try{return JSON.parse(localStorage.getItem(key())||'{}')}catch(e){return{}}}
+function save(d){localStorage.setItem(key(),JSON.stringify(d))}
+function fmt(n){return Math.round(n).toLocaleString('en-US')}
+function money(n){return '$'+n.toFixed(2)}
+let rows=[];
+function render(){
+ const dash=document.getElementById('dash');
+ if(!rows.length){dash.style.display='none';document.getElementById('status').textContent='Chưa có dữ liệu. Up file CSV để xem biểu đồ.';return}
+ dash.style.display='block';
+ rows.sort((a,b)=>a.date.localeCompare(b.date));
+ const sum=f=>rows.reduce((s,r)=>s+(r[f]||0),0);
+ const imp=sum('impressions'),earn=sum('earnings');
+ document.getElementById('kInstalls').textContent=fmt(sum('installs'));
+ document.getElementById('kUninstalls').textContent=fmt(sum('uninstalls'));
+ document.getElementById('kImpr').textContent=fmt(imp);
+ document.getElementById('kClicks').textContent=fmt(sum('clicks'));
+ document.getElementById('kEarn').textContent=money(earn);
+ document.getElementById('kEcpm').textContent=money(imp?earn/imp*1000:0);
+ document.getElementById('kCtr').textContent=(imp?sum('clicks')/imp*100:0).toFixed(2)+'%';
+ document.getElementById('kDays').textContent=rows.length;
+ document.getElementById('status').textContent='Đã có '+rows.length+' ngày dữ liệu ('+rows[0].date+' → '+rows[rows.length-1].date+'). Dữ liệu lưu trong trình duyệt này, đổi game ở trên để xem game kia.';
+ document.querySelector('#tbl tbody').innerHTML=rows.map(r=>'<tr><td>'+r.date+'</td><td>'+fmt(r.installs||0)+'</td><td>'+fmt(r.uninstalls||0)+'</td><td>'+fmt(r.impressions||0)+'</td><td>'+fmt(r.clicks||0)+'</td><td>'+(r.earnings||0).toFixed(2)+'</td><td>'+(r.impressions?(r.earnings/r.impressions*1000):0).toFixed(2)+'</td></tr>').join('');
+ draw();
+}
+function draw(){
+ const m=document.getElementById('metric').value;
+ const labels={earnings:'Doanh thu ($) theo ngày',installs:'Lượt cài mới theo ngày',impressions:'Impressions theo ngày',uninstalls:'Lượt gỡ cài đặt theo ngày'};
+ document.getElementById('chartTitle').textContent=labels[m];
+ const c=document.getElementById('chart'),x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);
+ const vals=rows.map(r=>r[m]||0),mx=Math.max(...vals,1);
+ x.strokeStyle='#26314a';x.beginPath();x.moveTo(50,10);x.lineTo(50,230);x.lineTo(910,230);x.stroke();
+ x.fillStyle='#9aa7bd';x.font='12px system-ui';
+ for(let i=0;i<=4;i++){const y=230-i*55;x.fillText((mx*i/4).toFixed(m==='earnings'?2:0),4,y+4);x.strokeStyle='#1c2436';x.beginPath();x.moveTo(50,y);x.lineTo(910,y);x.stroke()}
+ x.strokeStyle='#ffb020';x.lineWidth=2;x.beginPath();
+ vals.forEach((v,i)=>{const px=50+i*(860/Math.max(vals.length-1,1)),py=230-v/mx*200;i?x.lineTo(px,py):x.moveTo(px,py)});
+ x.stroke();x.fillStyle='#ffb020';
+ vals.forEach((v,i)=>{const px=50+i*(860/Math.max(vals.length-1,1)),py=230-v/mx*200;x.beginPath();x.arc(px,py,3,0,7);x.fill()});
+ x.fillStyle='#9aa7bd';x.fillText(rows[0].date,50,250);x.fillText(rows[rows.length-1].date,820,250);
+}
+function ingest(text, fname){
+ const parsed=parseCSV(text);if(parsed.length<2){alert('File '+fname+' không đọc được: cần ít nhất 1 dòng tiêu đề + 1 dòng dữ liệu.');return 0}
+ const head=parsed[0].map(h=>String(h).toLowerCase());
+ const cols={};head.forEach((h,i)=>{for(const [re,k] of MAP){if(re.test(h)&&!cols[k]){cols[k]=i;break}}});
+ if(cols.date==null){alert('File '+fname+': không tìm thấy cột ngày (Date).');return 0}
+ const data=load();let n=0;
+ for(const r of parsed.slice(1)){
+   const d=String(r[cols.date]||'').trim().slice(0,10);if(!/^\d{4}-\d{2}-\d{2}/.test(d))continue;
+   data[d]=data[d]||{date:d};
+   for(const k of ['installs','uninstalls','impressions','requests','clicks','earnings','ecpm','opens']) if(cols[k]!=null) data[d][k]=(data[d][k]||0)+num(r[cols[k]]);
+   n++;
+ }
+ save(data);rows=Object.values(data);render();return n;
+}
+document.getElementById('game').addEventListener('change',()=>{rows=Object.values(load());render()});
+document.getElementById('metric').addEventListener('change',draw);
+const drop=document.getElementById('drop'),fi=document.getElementById('file');
+drop.addEventListener('click',()=>fi.click());
+['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',ev=>handleFiles(ev.dataTransfer.files));
+fi.addEventListener('change',()=>handleFiles(fi.files));
+function handleFiles(fs){let total=0;[...fs].forEach(f=>{const rd=new FileReader();rd.onload=()=>{total+=ingest(rd.result,f.name);if(total)document.getElementById('status').textContent+='';};rd.readAsText(f)})}
+document.getElementById('sampleBtn').addEventListener('click',()=>{
+ const d=load();const base=new Date('2026-11-04');
+ for(let i=0;i<7;i++){const dt=new Date(base);dt.setDate(base.getDate()+i);const s=dt.toISOString().slice(0,10);
+  d[s]={date:s,installs:120+i*37,uninstalls:18+i*3,impressions:4200+i*900,clicks:38+i*9,earnings:+(3.2+i*1.4).toFixed(2)}}
+ save(d);rows=Object.values(d);render();alert('Đây là DỮ LIỆU MẪU demo (7 ngày, số bịa) để mày thử biểu đồ — up file CSV thật thì nó sẽ cộng dồn / thay thế theo ngày, bấm "Xóa dữ liệu" để xóa hết số mẫu.');
+});
+document.getElementById('clearBtn').addEventListener('click',()=>{if(confirm('Xóa hết dữ liệu đã up cho game này?')){localStorage.removeItem(key());rows=[];render()}});
+document.getElementById('exportBtn').addEventListener('click',()=>{
+ const csv='Date,Installs,Uninstalls,Impressions,Clicks,Estimated earnings\n'+rows.map(r=>[r.date,r.installs||0,r.uninstalls||0,r.impressions||0,r.clicks||0,(r.earnings||0).toFixed(2)].join(',')).join('\n');
+ download(csv,'game-analytics-merged.csv','text/csv');
+});
+document.getElementById('tplBtn').addEventListener('click',()=>download('Date,Installs,Uninstalls,Impressions,Clicks,Estimated earnings\n2026-11-11,0,0,0,0,0\n','game-analytics-template.csv','text/csv'));
+function download(content,name,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+rows=Object.values(load());render();
+</script>
+</body>
+</html>
